@@ -1,0 +1,2 @@
+# LifeScript
+creating LifeScript repo

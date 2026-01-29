@@ -6,7 +6,7 @@ from typing import Dict, List, Callable
 
 
 # -----------------------------
-# Core Logic (Same as Before)
+# Core Logic
 # -----------------------------
 
 @dataclass
@@ -94,6 +94,9 @@ class FinanceApp(tk.Tk):
         frame = ttk.Frame(self)
         frame.pack(padx=10, pady=10, fill="x")
 
+        # =============================
+        # Account Input Section
+        # =============================
         ttk.Label(frame, text="Account Name").grid(row=0, column=0)
         ttk.Label(frame, text="Starting Balance").grid(row=0, column=1)
         ttk.Label(frame, text="Annual Return").grid(row=0, column=2)
@@ -107,24 +110,34 @@ class FinanceApp(tk.Tk):
         self.return_entry.grid(row=1, column=2)
 
         ttk.Button(frame, text="Add Account", command=self.add_account).grid(row=1, column=3)
-        ttk.Button(frame, text="Remove Account", command=self.remove_account).grid(row=1, column=4)
+        ttk.Button(frame, text="Edit Account", command=self.edit_account).grid(row=1, column=4)
+        ttk.Button(frame, text="Remove Account", command=self.remove_account).grid(row=1, column=5)
 
-        ttk.Label(frame, text="Months to Simulate").grid(row=2, column=0)
+        # =============================
+        # Account List Section
+        # =============================
+        ttk.Label(frame, text="Accounts").grid(row=2, column=0, pady=(10, 0))
+
+        self.account_listbox = tk.Listbox(frame, height=6)
+        self.account_listbox.grid(row=3, column=0, columnspan=3, sticky="ew")
+        self.account_listbox.bind("<<ListboxSelect>>", self.load_account_for_edit)
+
+        # =============================
+        # Simulation Controls
+        # =============================
+        ttk.Label(frame, text="Months to Simulate").grid(row=4, column=0, pady=(10, 0))
         self.months_entry = ttk.Entry(frame)
-        self.months_entry.grid(row=2, column=1)
+        self.months_entry.grid(row=4, column=1)
 
-        ttk.Button(frame, text="Run Simulation", command=self.run_simulation).grid(row=2, column=3)
+        ttk.Button(frame, text="Run Simulation", command=self.run_simulation).grid(row=4, column=3)
 
-        self.output = tk.Text(self, height=20)
-        self.output.pack(padx=10, pady=10, fill="both", expand=True)
-
-        # -----------------------------
-        # Event Controls
-        # -----------------------------
-        ttk.Label(frame, text="Event Month").grid(row=3, column=0)
-        ttk.Label(frame, text="Event Type").grid(row=3, column=1)
-        ttk.Label(frame, text="Account").grid(row=3, column=2)
-        ttk.Label(frame, text="Amount / New APY").grid(row=3, column=3)
+        # =============================
+        # Event Input Section
+        # =============================
+        ttk.Label(frame, text="Event Month").grid(row=5, column=0, pady=(10, 0))
+        ttk.Label(frame, text="Event Type").grid(row=5, column=1, pady=(10, 0))
+        ttk.Label(frame, text="Account").grid(row=5, column=2, pady=(10, 0))
+        ttk.Label(frame, text="Amount / New APY").grid(row=5, column=3, pady=(10, 0))
 
         self.event_month_entry = ttk.Entry(frame, width=10)
         self.event_type_combo = ttk.Combobox(
@@ -136,12 +149,30 @@ class FinanceApp(tk.Tk):
         self.event_account_entry = ttk.Entry(frame, width=15)
         self.event_value_entry = ttk.Entry(frame, width=15)
 
-        self.event_month_entry.grid(row=4, column=0)
-        self.event_type_combo.grid(row=4, column=1)
-        self.event_account_entry.grid(row=4, column=2)
-        self.event_value_entry.grid(row=4, column=3)
+        self.event_month_entry.grid(row=6, column=0)
+        self.event_type_combo.grid(row=6, column=1)
+        self.event_account_entry.grid(row=6, column=2)
+        self.event_value_entry.grid(row=6, column=3)
 
-        ttk.Button(frame, text="Add Event", command=self.add_event).grid(row=4, column=4)
+        ttk.Button(frame, text="Add Event", command=self.add_event).grid(row=6, column=4)
+        ttk.Button(frame, text="Edit Event", command=self.edit_event).grid(row=6, column=5)
+        ttk.Button(frame, text="Remove Event", command=self.remove_event).grid(row=6, column=6)
+
+        # =============================
+        # Event List Section
+        # =============================
+        ttk.Label(frame, text="Events").grid(row=7, column=0, pady=(10, 0))
+
+        self.event_listbox = tk.Listbox(frame, height=6)
+        self.event_listbox.grid(row=8, column=0, columnspan=6, sticky="ew")
+        self.event_listbox.bind("<<ListboxSelect>>", self.load_event_for_edit)
+
+        # =============================
+        # Output Section
+        # =============================
+        self.output = tk.Text(self, height=20)
+        self.output.pack(padx=10, pady=10, fill="both", expand=True)
+
     def add_account(self):
         try:
             name = self.name_entry.get().strip()  # Added .strip() to catch whitespace-only names
@@ -168,36 +199,66 @@ class FinanceApp(tk.Tk):
             error_msg = str(e) if str(e) else "Invalid input. Please enter numbers for balance and return."
             messagebox.showerror("Error", error_msg)
 
-    def remove_account(self):
+    def load_account_for_edit(self, event):
+        selection = self.account_listbox.curselection()
+        if not selection:
+            return
+
+        name = self.account_listbox.get(selection[0])
+        account = self.accounts[name]
+
+        self.name_entry.delete(0, tk.END)
+        self.name_entry.insert(0, name)
+
+        self.balance_entry.delete(0, tk.END)
+        self.balance_entry.insert(0, account.balance)
+
+        self.return_entry.delete(0, tk.END)
+        self.return_entry.insert(0, account.annual_return)
+
+    def edit_account(self):
         name = self.name_entry.get().strip()
 
-        if not name:
-            messagebox.showerror("Error", "Enter the account name to remove")
-            return
-
         if name not in self.accounts:
-            messagebox.showerror("Error", f"Account '{name}' does not exist")
+            messagebox.showerror("Error", "Select an existing account to edit")
             return
 
-        # Confirm removal
+        try:
+            self.accounts[name].balance = float(self.balance_entry.get())
+            self.accounts[name].annual_return = float(self.return_entry.get())
+        except ValueError:
+            messagebox.showerror("Error", "Invalid account values")
+            return
+
+        self.refresh_account_list()
+        messagebox.showinfo("Updated", f"Account '{name}' updated")
+
+    def remove_account(self):
+        selection = self.account_listbox.curselection()
+        if not selection:
+            messagebox.showerror("Error", "Select an account to remove")
+            return
+
+        name = self.account_listbox.get(selection[0])
+
         confirm = messagebox.askyesno(
-            "Confirm Removal",
-            f"Remove account '{name}' and all related events?"
+            "Confirm",
+            f"Remove account '{name}' and all its events?"
         )
 
         if not confirm:
             return
 
-        # Remove account
         del self.accounts[name]
-
-        # Remove related events
         self.events = [e for e in self.events if e.account != name]
 
-        messagebox.showinfo("Success", f"Account '{name}' removed")
+        self.refresh_account_list()
+        self.refresh_event_list()
 
-        # Clear entry
-        self.name_entry.delete(0, tk.END)
+    def refresh_account_list(self):
+        self.account_listbox.delete(0, tk.END)
+        for name in self.accounts:
+            self.account_listbox.insert(tk.END, name)
 
     def add_event(self):
         try:
@@ -228,6 +289,61 @@ class FinanceApp(tk.Tk):
 
         except ValueError as e:
             messagebox.showerror("Error", str(e))
+
+    def refresh_event_list(self):
+        self.event_listbox.delete(0, tk.END)
+        for i, e in enumerate(self.events):
+            label = f"{e.month}: {e.description} ({e.account}, {e.amount})"
+            self.event_listbox.insert(tk.END, label)
+
+    def edit_event(self):
+        selection = self.event_listbox.curselection()
+        if not selection:
+            messagebox.showerror("Error", "Select an event to edit")
+            return
+
+        try:
+            idx = selection[0]
+            self.events[idx].month = int(self.event_month_entry.get())
+            self.events[idx].amount = float(self.event_amount_entry.get())
+            self.events[idx].account = self.event_account_entry.get()
+            self.events[idx].description = self.event_desc_entry.get()
+        except ValueError:
+            messagebox.showerror("Error", "Invalid event values")
+            return
+
+        self.refresh_event_list()
+        messagebox.showinfo("Updated", "Event updated")
+
+    def remove_event(self):
+        selection = self.event_listbox.curselection()
+        if not selection:
+            messagebox.showerror("Error", "Select an event to remove")
+            return
+
+        index = selection[0]
+        del self.events[index]
+
+        self.refresh_event_list()
+
+    def load_event_for_edit(self, event):
+        selection = self.event_listbox.curselection()
+        if not selection:
+            return
+
+        e = self.events[selection[0]]
+
+        self.event_month_entry.delete(0, tk.END)
+        self.event_month_entry.insert(0, e.month)
+
+        self.event_amount_entry.delete(0, tk.END)
+        self.event_amount_entry.insert(0, e.amount)
+
+        self.event_account_entry.delete(0, tk.END)
+        self.event_account_entry.insert(0, e.account)
+
+        self.event_desc_entry.delete(0, tk.END)
+        self.event_desc_entry.insert(0, e.description)
 
     def run_simulation(self):
         try:

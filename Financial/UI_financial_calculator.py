@@ -10,6 +10,13 @@ from typing import Dict, List, Callable
 # -----------------------------
 
 @dataclass
+class Event:
+    month: int
+    type: str
+    account: str
+    amount: float = 0.0
+    new_apy: float = 0.0
+@dataclass
 class Account:
     name: str
     balance: float
@@ -29,13 +36,33 @@ class Account:
 
 
 class FinancialSimulation:
-    def __init__(self, accounts: Dict[str, Account], months: int):
+    def __init__(self, accounts: Dict[str, Account], months: int, events: List[Event]):
         self.accounts = accounts
         self.months = months
+        self.events = events
         self.history = []
 
     def run(self):
         for month in range(1, self.months + 1):
+
+            # 🔹 Apply events scheduled for this month
+            for event in self.events:
+                if event.month == month:
+                    acc = self.accounts.get(event.account)
+
+                    if not acc:
+                        continue  # silently skip invalid accounts
+
+                    if event.type == "deposit":
+                        acc.deposit(event.amount)
+
+                    elif event.type == "expense":
+                        acc.withdraw(event.amount)
+
+                    elif event.type == "apy_change":
+                        acc.annual_return = event.new_apy
+
+            # 🔹 Apply monthly growth
             for acc in self.accounts.values():
                 acc.apply_growth()
 
@@ -49,6 +76,7 @@ class FinancialSimulation:
         return self.history
 
 
+
 # -----------------------------
 # GUI
 # -----------------------------
@@ -58,9 +86,8 @@ class FinanceApp(tk.Tk):
         super().__init__()
         self.title("Financial Simulation")
         self.geometry("700x500")
-
+        self.events: List[Event] = []
         self.accounts: Dict[str, Account] = {}
-
         self.create_widgets()
 
     def create_widgets(self):
@@ -80,6 +107,7 @@ class FinanceApp(tk.Tk):
         self.return_entry.grid(row=1, column=2)
 
         ttk.Button(frame, text="Add Account", command=self.add_account).grid(row=1, column=3)
+        ttk.Button(frame, text="Remove Account", command=self.remove_account).grid(row=1, column=4)
 
         ttk.Label(frame, text="Months to Simulate").grid(row=2, column=0)
         self.months_entry = ttk.Entry(frame)
@@ -90,6 +118,30 @@ class FinanceApp(tk.Tk):
         self.output = tk.Text(self, height=20)
         self.output.pack(padx=10, pady=10, fill="both", expand=True)
 
+        # -----------------------------
+        # Event Controls
+        # -----------------------------
+        ttk.Label(frame, text="Event Month").grid(row=3, column=0)
+        ttk.Label(frame, text="Event Type").grid(row=3, column=1)
+        ttk.Label(frame, text="Account").grid(row=3, column=2)
+        ttk.Label(frame, text="Amount / New APY").grid(row=3, column=3)
+
+        self.event_month_entry = ttk.Entry(frame, width=10)
+        self.event_type_combo = ttk.Combobox(
+            frame,
+            values=["deposit", "expense", "apy_change"],
+            state="readonly",
+            width=12
+        )
+        self.event_account_entry = ttk.Entry(frame, width=15)
+        self.event_value_entry = ttk.Entry(frame, width=15)
+
+        self.event_month_entry.grid(row=4, column=0)
+        self.event_type_combo.grid(row=4, column=1)
+        self.event_account_entry.grid(row=4, column=2)
+        self.event_value_entry.grid(row=4, column=3)
+
+        ttk.Button(frame, text="Add Event", command=self.add_event).grid(row=4, column=4)
     def add_account(self):
         try:
             name = self.name_entry.get().strip()  # Added .strip() to catch whitespace-only names
@@ -116,6 +168,66 @@ class FinanceApp(tk.Tk):
             error_msg = str(e) if str(e) else "Invalid input. Please enter numbers for balance and return."
             messagebox.showerror("Error", error_msg)
 
+    def remove_account(self):
+        name = self.name_entry.get().strip()
+
+        if not name:
+            messagebox.showerror("Error", "Enter the account name to remove")
+            return
+
+        if name not in self.accounts:
+            messagebox.showerror("Error", f"Account '{name}' does not exist")
+            return
+
+        # Confirm removal
+        confirm = messagebox.askyesno(
+            "Confirm Removal",
+            f"Remove account '{name}' and all related events?"
+        )
+
+        if not confirm:
+            return
+
+        # Remove account
+        del self.accounts[name]
+
+        # Remove related events
+        self.events = [e for e in self.events if e.account != name]
+
+        messagebox.showinfo("Success", f"Account '{name}' removed")
+
+        # Clear entry
+        self.name_entry.delete(0, tk.END)
+
+    def add_event(self):
+        try:
+            month = int(self.event_month_entry.get())
+            event_type = self.event_type_combo.get()
+            account = self.event_account_entry.get().strip()
+
+            if not account:
+                raise ValueError("Account name required")
+
+            if event_type not in ["deposit", "expense", "apy_change"]:
+                raise ValueError("Invalid event type")
+
+            if event_type == "apy_change":
+                new_apy = float(self.event_value_entry.get())
+                event = Event(month, event_type, account, new_apy=new_apy)
+            else:
+                amount = float(self.event_value_entry.get())
+                event = Event(month, event_type, account, amount=amount)
+
+            self.events.append(event)
+            messagebox.showinfo("Success", f"Event added for month {month}")
+
+            # Clear inputs
+            self.event_month_entry.delete(0, tk.END)
+            self.event_account_entry.delete(0, tk.END)
+            self.event_value_entry.delete(0, tk.END)
+
+        except ValueError as e:
+            messagebox.showerror("Error", str(e))
 
     def run_simulation(self):
         try:
@@ -127,7 +239,8 @@ class FinanceApp(tk.Tk):
                 for name, acc in self.accounts.items()
             }
 
-            sim = FinancialSimulation(accounts_copy, months)
+            sim = FinancialSimulation(accounts_copy, months, self.events)
+
             history = sim.run()
 
             self.output.delete("1.0", tk.END)

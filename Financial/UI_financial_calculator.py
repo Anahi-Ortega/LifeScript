@@ -174,29 +174,24 @@ class FinanceApp(tk.Tk):
 
     def add_account(self):
         try:
-            name = self.name_entry.get().strip()  # Added .strip() to catch whitespace-only names
-
-            # 1. Validate name first
+            name = self.name_entry.get().strip()
             if not name:
                 raise ValueError("Account name required")
 
-            # 2. Convert numerical inputs
             balance = float(self.balance_entry.get())
             annual_return = float(self.return_entry.get())
 
-            # 3. Create the account
             self.accounts[name] = Account(name, balance, annual_return)
+            self.refresh_account_list()
+
             messagebox.showinfo("Success", f"Added account: {name}")
 
-            # 4. Clear entries
             self.name_entry.delete(0, tk.END)
             self.balance_entry.delete(0, tk.END)
             self.return_entry.delete(0, tk.END)
 
         except ValueError as e:
-            # This will now catch both empty names and non-numeric inputs
-            error_msg = str(e) if str(e) else "Invalid input. Please enter numbers for balance and return."
-            messagebox.showerror("Error", error_msg)
+            messagebox.showerror("Error", str(e))
 
     def load_account_for_edit(self, event):
         selection = self.account_listbox.curselection()
@@ -207,7 +202,7 @@ class FinanceApp(tk.Tk):
         account = self.accounts[name]
 
         self.name_entry.delete(0, tk.END)
-        self.name_entry.insert(0, name)
+        self.name_entry.insert(0, account.name)
 
         self.balance_entry.delete(0, tk.END)
         self.balance_entry.insert(0, account.balance)
@@ -216,21 +211,37 @@ class FinanceApp(tk.Tk):
         self.return_entry.insert(0, account.annual_return)
 
     def edit_account(self):
-        name = self.name_entry.get().strip()
-
-        if name not in self.accounts:
-            messagebox.showerror("Error", "Select an existing account to edit")
+        selection = self.account_listbox.curselection()
+        if not selection:
+            messagebox.showerror("Error", "Select an account to edit")
             return
 
+        old_name = self.account_listbox.get(selection[0])
+        new_name = self.name_entry.get().strip()
+
         try:
-            self.accounts[name].balance = float(self.balance_entry.get())
-            self.accounts[name].annual_return = float(self.return_entry.get())
+            balance = float(self.balance_entry.get())
+            annual_return = float(self.return_entry.get())
         except ValueError:
             messagebox.showerror("Error", "Invalid account values")
             return
 
+        # Rename safely
+        if new_name != old_name:
+            self.accounts[new_name] = self.accounts.pop(old_name)
+            self.accounts[new_name].name = new_name
+
+            # Update events that reference this account
+            for e in self.events:
+                if e.account == old_name:
+                    e.account = new_name
+
+        self.accounts[new_name].balance = balance
+        self.accounts[new_name].annual_return = annual_return
+
         self.refresh_account_list()
-        messagebox.showinfo("Updated", f"Account '{name}' updated")
+        self.refresh_event_list()
+        messagebox.showinfo("Updated", f"Account '{new_name}' updated")
 
     def remove_account(self):
         selection = self.account_listbox.curselection()
@@ -240,12 +251,7 @@ class FinanceApp(tk.Tk):
 
         name = self.account_listbox.get(selection[0])
 
-        confirm = messagebox.askyesno(
-            "Confirm",
-            f"Remove account '{name}' and all its events?"
-        )
-
-        if not confirm:
+        if not messagebox.askyesno("Confirm", f"Remove account '{name}' and all its events?"):
             return
 
         del self.accounts[name]
@@ -256,7 +262,7 @@ class FinanceApp(tk.Tk):
 
     def refresh_account_list(self):
         self.account_listbox.delete(0, tk.END)
-        for name in self.accounts:
+        for name in sorted(self.accounts):
             self.account_listbox.insert(tk.END, name)
 
     def add_event(self):
@@ -265,11 +271,8 @@ class FinanceApp(tk.Tk):
             event_type = self.event_type_combo.get()
             account = self.event_account_entry.get().strip()
 
-            if not account:
-                raise ValueError("Account name required")
-
-            if event_type not in ["deposit", "expense", "apy_change"]:
-                raise ValueError("Invalid event type")
+            if account not in self.accounts:
+                raise ValueError("Account does not exist")
 
             if event_type == "apy_change":
                 new_apy = float(self.event_value_entry.get())
@@ -279,9 +282,10 @@ class FinanceApp(tk.Tk):
                 event = Event(month, event_type, account, amount=amount)
 
             self.events.append(event)
+            self.refresh_event_list()
+
             messagebox.showinfo("Success", f"Event added for month {month}")
 
-            # Clear inputs
             self.event_month_entry.delete(0, tk.END)
             self.event_account_entry.delete(0, tk.END)
             self.event_value_entry.delete(0, tk.END)
@@ -291,9 +295,35 @@ class FinanceApp(tk.Tk):
 
     def refresh_event_list(self):
         self.event_listbox.delete(0, tk.END)
-        for i, e in enumerate(self.events):
-            label = f"{e.month}: {e.description} ({e.account}, {e.amount})"
+
+        for e in self.events:
+            if e.type == "apy_change":
+                label = f"Month {e.month}: APY → {e.new_apy} ({e.account})"
+            else:
+                label = f"Month {e.month}: {e.type} {e.amount} ({e.account})"
+
             self.event_listbox.insert(tk.END, label)
+
+    def load_event_for_edit(self, event):
+        selection = self.event_listbox.curselection()
+        if not selection:
+            return
+
+        e = self.events[selection[0]]
+
+        self.event_month_entry.delete(0, tk.END)
+        self.event_month_entry.insert(0, e.month)
+
+        self.event_type_combo.set(e.type)
+
+        self.event_account_entry.delete(0, tk.END)
+        self.event_account_entry.insert(0, e.account)
+
+        self.event_value_entry.delete(0, tk.END)
+        if e.type == "apy_change":
+            self.event_value_entry.insert(0, e.new_apy)
+        else:
+            self.event_value_entry.insert(0, e.amount)
 
     def edit_event(self):
         selection = self.event_listbox.curselection()
@@ -303,10 +333,19 @@ class FinanceApp(tk.Tk):
 
         try:
             idx = selection[0]
-            self.events[idx].month = int(self.event_month_entry.get())
-            self.events[idx].amount = float(self.event_amount_entry.get())
-            self.events[idx].account = self.event_account_entry.get()
-            self.events[idx].description = self.event_desc_entry.get()
+            e = self.events[idx]
+
+            e.month = int(self.event_month_entry.get())
+            e.account = self.event_account_entry.get()
+            e.type = self.event_type_combo.get()
+
+            if e.type == "apy_change":
+                e.new_apy = float(self.event_value_entry.get())
+                e.amount = 0.0
+            else:
+                e.amount = float(self.event_value_entry.get())
+                e.new_apy = 0.0
+
         except ValueError:
             messagebox.showerror("Error", "Invalid event values")
             return
@@ -320,29 +359,8 @@ class FinanceApp(tk.Tk):
             messagebox.showerror("Error", "Select an event to remove")
             return
 
-        index = selection[0]
-        del self.events[index]
-
+        del self.events[selection[0]]
         self.refresh_event_list()
-
-    def load_event_for_edit(self, event):
-        selection = self.event_listbox.curselection()
-        if not selection:
-            return
-
-        e = self.events[selection[0]]
-
-        self.event_month_entry.delete(0, tk.END)
-        self.event_month_entry.insert(0, e.month)
-
-        self.event_amount_entry.delete(0, tk.END)
-        self.event_amount_entry.insert(0, e.amount)
-
-        self.event_account_entry.delete(0, tk.END)
-        self.event_account_entry.insert(0, e.account)
-
-        self.event_desc_entry.delete(0, tk.END)
-        self.event_desc_entry.insert(0, e.description)
 
     def run_simulation(self):
         try:

@@ -1,8 +1,7 @@
-import copy
 import tkinter as tk
 from tkinter import ttk, messagebox
 from dataclasses import dataclass
-from typing import Dict, List, Callable
+from typing import Dict, List
 
 
 # -----------------------------

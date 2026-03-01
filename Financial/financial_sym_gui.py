@@ -1,14 +1,16 @@
-#-----------------------
+# -----------------------------
 # Latest version
 # How does this work?
 # Downloading and running on a local machine will enter open a GUI
 #
-#
+# -----------------------------
 
 import tkinter as tk
+import matplotlib.pyplot as plt
 from tkinter import ttk, messagebox
 from dataclasses import dataclass
 from typing import Dict, List
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 
 # -----------------------------
@@ -96,7 +98,7 @@ class FinanceApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Financial Simulation")
-        self.geometry("700x500")
+        self.geometry("800x900")
         self.events: List[Event] = []
         self.accounts: Dict[str, Account] = {}
         self.create_widgets()
@@ -184,8 +186,13 @@ class FinanceApp(tk.Tk):
         # =============================
         # Output Section
         # =============================
-        self.output = tk.Text(self, height=20)
-        self.output.pack(padx=10, pady=10, fill="both", expand=True)
+        # Output text
+        self.output = tk.Text(self, height=10)
+        self.output.pack(padx=10, pady=5, fill="x")
+
+        # Chart frame
+        self.chart_frame = ttk.Frame(self)
+        self.chart_frame.pack(fill="both", expand=True)
 
     def add_account(self):
         try:
@@ -472,7 +479,7 @@ class FinanceApp(tk.Tk):
         try:
             months = int(self.months_entry.get())
 
-            # 🔐 Deep copy accounts so we don't mutate originals
+            # Deep copy accounts so we don't mutate originals
             accounts_copy = {
                 name: Account(
                     acc.name,
@@ -491,10 +498,37 @@ class FinanceApp(tk.Tk):
             for row in history:
                 self.output.insert(tk.END, f"{row}\n")
 
+            self.render_chart(history)
+
         except ValueError:
             messagebox.showerror("Error", "Invalid months")
 
+    def render_chart(self, history):
+        # Clear old chart
+        for widget in self.chart_frame.winfo_children():
+            widget.destroy()
 
+        fig, ax = plt.subplots(figsize=(6, 4))
+
+        months = [row["Month"] for row in history]
+
+        # Plot each account
+        for account_name in self.accounts.keys():
+            balances = [row.get(account_name, 0) for row in history]
+            ax.plot(months, balances, label=account_name)
+
+        # Plot total
+        totals = [row["Total"] for row in history]
+        ax.plot(months, totals, linestyle="--", linewidth=2, label="Total")
+
+        ax.set_title("Account Growth Over Time")
+        ax.set_xlabel("Month")
+        ax.set_ylabel("Balance")
+        ax.legend()
+
+        canvas = FigureCanvasTkAgg(fig, master=self.chart_frame)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill="both", expand=True)
 # -----------------------------
 # Run App
 # -----------------------------

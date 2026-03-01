@@ -1,3 +1,10 @@
+#-----------------------
+# Latest version
+# How does this work?
+# Downloading and running on a local machine will enter open a GUI
+#
+#
+
 import tkinter as tk
 from tkinter import ttk, messagebox
 from dataclasses import dataclass
@@ -110,7 +117,6 @@ class FinanceApp(tk.Tk):
         self.balance_entry = ttk.Entry(frame)
         self.return_entry = ttk.Entry(frame)
         self.contribution_entry = ttk.Entry(frame)
-        self.contribution_entry.delete(0, tk.END) #may not be where this belongs
 
         self.name_entry.grid(row=1, column=0)
         self.balance_entry.grid(row=1, column=1)
@@ -298,6 +304,8 @@ class FinanceApp(tk.Tk):
         temp_apy = acc.annual_return
 
         for month in range(1, target_month + 1):
+            temp_balance += acc.monthly_contribution
+
             for e in self.events:
                 if e.month == month and e.account == account_name:
                     if e.type == "deposit":
@@ -466,7 +474,12 @@ class FinanceApp(tk.Tk):
 
             # 🔐 Deep copy accounts so we don't mutate originals
             accounts_copy = {
-                name: Account(acc.name, acc.balance, acc.annual_return)
+                name: Account(
+                    acc.name,
+                    acc.balance,
+                    acc.annual_return,
+                    acc.monthly_contribution
+                )
                 for name, acc in self.accounts.items()
             }
 

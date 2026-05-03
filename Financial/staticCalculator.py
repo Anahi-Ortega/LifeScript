@@ -1,3 +1,34 @@
+"""How You Customize This (Safely)
+🔧 Change starting balances
+Account("HYSA", 50000, 0.035)
+
+🔧 Add or remove account types
+
+Just add/remove from the accounts dictionary:
+
+"401k": Account("401k", 10000, 0.075)
+
+🔧 Change APY at a future date
+Event(
+    month=60,
+    action=lambda accs: setattr(accs["HYSA"], "annual_return", 0.025)
+)
+
+🔧 Add vacations, cars, emergencies
+Event(
+    month=48,
+    action=lambda accs: accs["Brokerage"].withdraw(5000),
+    description="Vacation"
+)
+
+🔧 Monthly vs Yearly Output
+
+Monthly: print every row
+
+Yearly: if row["Month"] % 12 == 0
+
+You can also export history to CSV later if you want.
+"""
 from dataclasses import dataclass
 from typing import List, Dict, Callable
 
@@ -131,34 +162,3 @@ if __name__ == "__main__":
 
 
 
-"""How You Customize This (Safely)
-🔧 Change starting balances
-Account("HYSA", 50000, 0.035)
-
-🔧 Add or remove account types
-
-Just add/remove from the accounts dictionary:
-
-"401k": Account("401k", 10000, 0.075)
-
-🔧 Change APY at a future date
-Event(
-    month=60,
-    action=lambda accs: setattr(accs["HYSA"], "annual_return", 0.025)
-)
-
-🔧 Add vacations, cars, emergencies
-Event(
-    month=48,
-    action=lambda accs: accs["Brokerage"].withdraw(5000),
-    description="Vacation"
-)
-
-🔧 Monthly vs Yearly Output
-
-Monthly: print every row
-
-Yearly: if row["Month"] % 12 == 0
-
-You can also export history to CSV later if you want.
-"""
